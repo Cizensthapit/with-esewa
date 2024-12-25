@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>User Dashboard</title>
+  <link rel="stylesheet" href="dash.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f8f9fa;
+    }
+    .container {
+      display: flex;
+    }
+    nav {
+      width: 200px;
+      background-color: #333;
+      color: #fff;
+      height: 100vh;
+      position: fixed;
+    }
+    nav ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    nav ul li {
+      width: 100%;
+    }
+    nav ul li a {
+      text-decoration: none;
+      color: #fff;
+      display: block;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+      font-size: 18px;
+    }
+    nav ul li a:hover {
+      background-color: #444;
+    }
+    .main {
+      flex: 1;
+      padding: 20px;
+      margin-left: 200px; /* Align main content to the right of the fixed nav */
+    }
+    .main-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .main-skills {
+      display: flex;
+      justify-content: space-around;
+      margin: 20px 0;
+    }
+    .card {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+      flex: 1;
+      margin: 0 10px;
+    }
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+    
+    .main-skills .card p {
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table thead {
+      background-color: #007bff;
+      color: #fff;
+    }
+    table th, table td {
+      padding: 15px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    table tbody tr:hover {
+      background-color: #f1f1f1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <ul>
+        <li><a href="" class="logo">
+          <img src="logo.png" alt="" style="width: 150px; height: auto;">
+        </a></li>
+        <li><a href="index.php">
+          <i class="fas fa-home"></i>
+          <span class="nav-item">Home</span>
+        </a></li>
+        <li><a href="profile.php">
+          <i class="fas fa-user"></i>
+          <span class="nav-item">Profile</span>
+        </a></li>
+        <li><a href="report.php">
+          <i class="fas fa-question-circle"></i>
+          <span class="nav-item">Help</span>
+        </a></li>
+      </ul>
+    </nav>
+    <section class="main">
+      <div class="main-skills">
+        <div class="card">
+          <h3>Total Expenditure</h3>
+          <p id="total-expenditure">Calculating...</p>
+        </div>
+      </div>
+
+      <section class="main-course">
+        <h1>My Orders</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Product Name</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Total Price</th>
+                <th>Order Date & Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+            <?php
+session_start();
+
+// Database connection
+$servername = "localhost"; // Assuming your XAMPP server is running locally
+$username = "root"; // Your MySQL username
+$password = ""; // Your MySQL password
+$database = "medlifemis_db"; // Your database name
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $database);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Retrieve user_id from session
+if(isset($_SESSION['user_id'])) {
+    $user_id = $_SESSION['user_id'];
+
+    // SQL query to fetch orders data for the specific user_id
+    $sql = "SELECT product_name, product_price, quantity, (product_price * quantity) AS total_price, order_date FROM `order` WHERE user_id = '$user_id' ORDER BY order_date DESC";
+    $result = $conn->query($sql);
+    $total_expenditure = 0;
+
+    if ($result->num_rows > 0) {
+        // Output data of each row
+        while($row = $result->fetch_assoc()) {
+            echo "<tr>";
+            echo "<td>" . $row["product_name"] . "</td>";
+            echo "<td>" . $row["product_price"] . "</td>";
+            echo "<td>" . $row["quantity"] . "</td>";
+            echo "<td>" . $row["total_price"] . "</td>";
+            echo "<td>" . $row["order_date"] . "</td>";
+            
+            // Check if the order exists in the approvedorder_db
+            $product_name = $row["product_name"];
+            $product_price = $row["product_price"];
+            $quantity = $row["quantity"];
+            $order_date = $row["order_date"];
+
+            $status_sql = "SELECT * FROM `approvedorder_db` WHERE product_name = '$product_name' AND product_price = '$product_price' AND quantity = '$quantity' AND order_date = '$order_date' AND user_id = '$user_id'";
+            $status_result = $conn->query($status_sql);
+
+            if ($status_result->num_rows > 0) {
+                echo "<td>Approved</td>";
+            } else {
+                echo "<td>Pending</td>";
+            }
+
+            echo "</tr>";
+            $total_expenditure += $row["total_price"];
+        }
+    } else {
+        echo "<tr><td colspan='6'>No orders found for this user</td></tr>";
+    }
+
+    // Display total expenditure
+    echo "<script>
+            document.getElementById('total-expenditure').innerText = 'Rs " . number_format($total_expenditure, 2) . "';
+          </script>";
+} else {
+    echo "<tr><td colspan='6'>User not logged in</td></tr>";
+}
+
+$conn->close();
+?>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "medlifemis_db";
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+  die("Connection failed: " . $conn->connect_error);
+}
+
+// SQL query to fetch all data from the order table, sorted by order_date in descending order
+$sql = "SELECT order_id, user_id, product_id, product_name, product_price, quantity, order_date 
+        FROM `order`
+        ORDER BY user_id, order_date DESC";
+
+$result = $conn->query($sql);
+
+// Calculate the total number of orders
+$totalOrders = ($result) ? $result->num_rows : 0;
+
+if ($result === false) {
+  echo "Error: " . $conn->error;
+} elseif ($totalOrders > 0) {
+  // Output data in tabulated form, grouped by user_id
+  $current_user_id = null;
+  $current_order_date = null;
+  
+  echo '
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Summary</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f2f5;
+        margin: 0;
+        padding: 20px;
+      }
+      h1, h2, h3 {
+        text-align: center;
+        color: #333;
+      }
+      .total-orders-container {
+        width: 80%;
+        margin: 20px auto;
+        padding: 10px;
+        background-color: #007bff;
+        color: white;
+        text-align: center;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      table {
+        width: 80%;
+        margin: 20px auto;
+        border-collapse: collapse;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+      }
+      table, th, td {
+        border: 1px solid #ddd;
+      }
+      th, td {
+        padding: 12px;
+        text-align: left;
+      }
+      th {
+        background-color: #007bff;
+        color: white;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      tr:hover {
+        background-color: #f1f1f1;
+      }
+      .bold {
+        font-weight: bold;
+      }
+      .delete-order-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background-color: #f44336;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Order Summary</h1>
+    <div class="total-orders-container">
+      Total Orders: ' . $totalOrders . '
+    </div>';
+  
+  echo '<form action="completeorder.php" method="post">';
+  
+  while($row = $result->fetch_assoc()) {
+    if ($current_user_id !== $row['user_id']) {
+      if ($current_user_id !== null) {
+        // Add total amount row before closing the table
+        echo '<tr>
+                <td colspan="7" class="bold" style="text-align: right;">Total Amount:</td>
+                <td colspan="2" class="bold">' . number_format($totalAmount, 2) . '</td>
+              </tr>';
+        echo '</table><br>';
+      }
+      $current_user_id = $row['user_id'];
+      $current_order_date = null;
+      $totalAmount = 0; // Reset total amount for new user
+      echo "<h2>Orders for User ID: " . $row['user_id'] . "</h2>";
+      echo '<table>
+              <tr>
+                <th>Order ID</th>
+                <th>User ID</th>
+                <th>Product ID</th>
+                <th>Product Name</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Order Date</th>
+                <th>Dispatch Date</th>
+                <th>Action</th>
+              </tr>';
+    }
+    
+    if ($current_order_date !== $row['order_date']) {
+      $current_order_date = $row['order_date'];
+      echo '<tr><td colspan="9" class="bold">Date: ' . $current_order_date . '</td></tr>';
+    }
+    
+    // Calculate dispatch date (order_date + 2 days)
+    $order_date = new DateTime($row['order_date']);
+    $dispatch_date = clone $order_date;
+    $dispatch_date->modify('+2 days');
+    
+    // Calculate total amount
+    $totalAmount += $row['product_price'] * $row['quantity'];
+    
+    echo "<tr>";
+    echo "<td>" . $row['order_id'] . "</td>";
+    echo "<td>" . $row['user_id'] . "</td>";
+    echo "<td>" . $row['product_id'] . "</td>";
+    echo "<td>" . $row['product_name'] . "</td>";
+    echo "<td>" . $row['product_price'] . "</td>";
+    echo "<td>" . $row['quantity'] . "</td>";
+    echo "<td class='bold'>" . $row['order_date'] . "</td>";
+    echo "<td class='bold'>" . $dispatch_date->format('Y-m-d') . "</td>";
+    echo "<td>
+            <button type='submit' class='delete-order-btn' name='delete_order' value='" . $row['order_id'] . "'>Delete Order</button>
+          </td>";
+    echo "</tr>";
+  }
+  
+  // Add total amount row for the last user table
+  if ($current_user_id !== null) {
+    echo '<tr>
+            <td colspan="7" class="bold" style="text-align: right;">Total Amount:</td>
+            <td colspan="2" class="bold">' . number_format($totalAmount, 2) . '</td>
+          </tr>';
+    echo '</table>';
+  }
+
+  echo '</form>';
+  echo '
+  </body>
+  </html>';
+} else {
+  echo "No orders found.";
+}
+
+$conn->close();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Summary</title>
+</head>
+<body>
+  <!-- Add button with inline CSS outside the message div -->
+  <div style="display: flex; justify-content: center; margin-top: 20px;">
+    <button onclick="window.location.href='admin.php'" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Go to Admin Page</button>
+  </div>
+</body>
+</html>
